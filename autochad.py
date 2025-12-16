@@ -75,14 +75,15 @@ class GridGraphicsView(QGraphicsView):
         left = int(math.floor(rect.left())) - (int(math.floor(rect.left())) % GRID_SIZE)
         top = int(math.floor(rect.top())) - (int(math.floor(rect.top())) % GRID_SIZE)
 
-        x = left
+        # Use QPointF to avoid overload resolution errors when mixing ints/floats.
+        x = float(left)
         while x < rect.right():
-            painter.drawLine(x, rect.top(), x, rect.bottom())
+            painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
             x += GRID_SIZE
 
-        y = top
+        y = float(top)
         while y < rect.bottom():
-            painter.drawLine(rect.left(), y, rect.right(), y)
+            painter.drawLine(QPointF(rect.left(), y), QPointF(rect.right(), y))
             y += GRID_SIZE
 
         painter.restore()

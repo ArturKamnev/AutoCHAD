@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt
-from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
+from PyQt6.QtGui import QBrush, QColor, QKeySequence, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication,
     QDockWidget,
@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QGraphicsItem,
     QGraphicsLineItem,
     QGraphicsRectItem,
+    QGraphicsSimpleTextItem,
     QGraphicsScene,
     QGraphicsView,
     QLabel,
@@ -70,7 +71,7 @@ class GridGraphicsView(QGraphicsView):
         """Draw a light grid in the background."""
         super().drawBackground(painter, rect)
         painter.save()
-        painter.setPen(QPen(QColor(220, 220, 220)))
+        painter.setPen(QPen(QColor(220, 220, 220, 60)))
 
         left = int(math.floor(rect.left())) - (int(math.floor(rect.left())) % GRID_SIZE)
         top = int(math.floor(rect.top())) - (int(math.floor(rect.top())) % GRID_SIZE)
@@ -173,10 +174,30 @@ class SelectionManager:
         self._previous_pen = None
 
 
+class UndoManager:
+    """Track reversible actions for undo support."""
+
+    def __init__(self) -> None:
+        self._stack: list[Callable[[], None]] = []
+
+    def push(self, action: Callable[[], None]) -> None:
+        self._stack.append(action)
+
+    def undo(self) -> None:
+        if not self._stack:
+            return
+        try:
+            action = self._stack.pop()
+            action()
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"Undo failed: {exc}")
+
+
 @dataclass
 class ToolContext:
     scene: QGraphicsScene
     selection: SelectionManager
+    undo: UndoManager
 
 
 class CanvasTool:
@@ -210,6 +231,50 @@ class CanvasTool:
         self.cancel()
 
 
+class DimensionLineItem(QGraphicsLineItem):
+    """Line item that maintains a dimension label."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.label = QGraphicsSimpleTextItem(self)
+        self.label.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+        self.label.setBrush(QBrush(QColor(60, 60, 60)))
+        self.update_label()
+
+    def setLine(self, *args) -> None:  # noqa: N802
+        super().setLine(*args)
+        self.update_label()
+
+    def update_label(self) -> None:
+        line = self.line()
+        length = math.hypot(line.dx(), line.dy())
+        self.label.setText(f"{length:.2f}")
+        mid_x = (line.x1() + line.x2()) / 2
+        mid_y = (line.y1() + line.y2()) / 2
+        self.label.setPos(QPointF(mid_x + 5, mid_y + 5))
+
+
+class DimensionRectItem(QGraphicsRectItem):
+    """Rectangle item with width/height label."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.label = QGraphicsSimpleTextItem(self)
+        self.label.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+        self.label.setBrush(QBrush(QColor(60, 60, 60)))
+        self.update_label()
+
+    def setRect(self, *args) -> None:  # noqa: N802
+        super().setRect(*args)
+        self.update_label()
+
+    def update_label(self) -> None:
+        rect = self.rect()
+        text = f"W:{rect.width():.2f} H:{rect.height():.2f}"
+        self.label.setText(text)
+        self.label.setPos(rect.center() + QPointF(5, 5))
+
+
 class LineTool(CanvasTool):
     name = "LINE"
 
@@ -222,7 +287,7 @@ class LineTool(CanvasTool):
         if not self.preview_item:
             pen = QPen(QColor(0, 120, 215))
             pen.setStyle(Qt.PenStyle.DashLine)
-            self.preview_item = QGraphicsLineItem()
+            self.preview_item = DimensionLineItem()
             self.preview_item.setPen(pen)
             self.preview_item.setZValue(10)
             self.context.scene.addItem(self.preview_item)
@@ -230,15 +295,31 @@ class LineTool(CanvasTool):
     def on_move(self, pos: QPointF) -> None:
         if self._start is None or not isinstance(self.preview_item, QGraphicsLineItem):
             return
-        self.preview_item.setLine(self._start.x(), self._start.y(), pos.x(), pos.y())
+        adjusted = self.view.event_delegate.apply_ortho(pos, self._start)
+        self.preview_item.setLine(
+            self._start.x(),
+            self._start.y(),
+            adjusted.x(),
+            adjusted.y(),
+        )
 
     def on_release(self, pos: QPointF) -> None:
         if self._start is None:
             return
-        line_item = QGraphicsLineItem(self._start.x(), self._start.y(), pos.x(), pos.y())
+        adjusted = self.view.event_delegate.apply_ortho(pos, self._start)
+        line_item = DimensionLineItem(
+            self._start.x(), self._start.y(), adjusted.x(), adjusted.y()
+        )
         line_item.setPen(QPen(QColor(0, 0, 0), 1.5))
         self.context.scene.addItem(line_item)
         self.context.selection.select(line_item)
+
+        def undo() -> None:
+            if self.context.selection.current is line_item:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(line_item)
+
+        self.context.undo.push(undo)
         self.finalize()
 
 
@@ -254,7 +335,7 @@ class RectangleTool(CanvasTool):
         if not self.preview_item:
             pen = QPen(QColor(0, 120, 215))
             pen.setStyle(Qt.PenStyle.DashLine)
-            rect = QGraphicsRectItem()
+            rect = DimensionRectItem()
             rect.setPen(pen)
             rect.setBrush(QBrush(QColor(0, 120, 215, 40)))
             rect.setZValue(10)
@@ -271,11 +352,18 @@ class RectangleTool(CanvasTool):
         if self._origin is None:
             return
         rect = QRectF(self._origin, pos).normalized()
-        rect_item = QGraphicsRectItem(rect)
+        rect_item = DimensionRectItem(rect)
         rect_item.setPen(QPen(QColor(0, 0, 0), 1.5))
         rect_item.setBrush(QBrush(QColor(200, 200, 255, 80)))
         self.context.scene.addItem(rect_item)
         self.context.selection.select(rect_item)
+
+        def undo() -> None:
+            if self.context.selection.current is rect_item:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(rect_item)
+
+        self.context.undo.push(undo)
         self.finalize()
 
 
@@ -325,6 +413,13 @@ class CircleTool(CanvasTool):
         ellipse_item.setBrush(QBrush(QColor(200, 255, 200, 80)))
         self.context.scene.addItem(ellipse_item)
         self.context.selection.select(ellipse_item)
+
+        def undo() -> None:
+            if self.context.selection.current is ellipse_item:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(ellipse_item)
+
+        self.context.undo.push(undo)
         self.finalize()
 
 
@@ -335,6 +430,8 @@ class CanvasEventDelegate:
         self.view = view
         self.context = context
         self.active_tool: Optional[CanvasTool] = None
+        self.snap_enabled = True
+        self.ortho_active = False
 
     def set_tool(self, tool: Optional[CanvasTool]) -> None:
         if self.active_tool:
@@ -345,7 +442,7 @@ class CanvasEventDelegate:
 
     def handle_mouse_press(self, event) -> bool:
         try:
-            scene_pos = self.view.view_to_scene(event.pos())
+            scene_pos = self.snap_position(self.view.view_to_scene(event.pos()))
             if self.active_tool:
                 self.active_tool.on_press(scene_pos)
                 return True
@@ -360,7 +457,7 @@ class CanvasEventDelegate:
         if not self.active_tool:
             return False
         try:
-            scene_pos = self.view.view_to_scene(event.pos())
+            scene_pos = self.snap_position(self.view.view_to_scene(event.pos()))
             self.active_tool.on_move(scene_pos)
             return True
         except Exception as exc:  # pragma: no cover - defensive
@@ -371,12 +468,29 @@ class CanvasEventDelegate:
         if not self.active_tool:
             return False
         try:
-            scene_pos = self.view.view_to_scene(event.pos())
+            scene_pos = self.snap_position(self.view.view_to_scene(event.pos()))
             self.active_tool.on_release(scene_pos)
             return True
         except Exception as exc:  # pragma: no cover - defensive
             QMessageBox.critical(self.view, "Error", f"Mouse release failed: {exc}")
             return True
+
+    def snap_position(self, pos: QPointF) -> QPointF:
+        if not self.snap_enabled:
+            return pos
+        return QPointF(
+            round(pos.x() / GRID_SIZE) * GRID_SIZE,
+            round(pos.y() / GRID_SIZE) * GRID_SIZE,
+        )
+
+    def apply_ortho(self, pos: QPointF, origin: Optional[QPointF]) -> QPointF:
+        if not self.ortho_active or origin is None:
+            return pos
+        dx = abs(pos.x() - origin.x())
+        dy = abs(pos.y() - origin.y())
+        if dx >= dy:
+            return QPointF(pos.x(), origin.y())
+        return QPointF(origin.x(), pos.y())
 
 
 class PropertiesPanel(QDockWidget):
@@ -459,13 +573,17 @@ class MainWindow(QMainWindow):
         self.scene.setSceneRect(-5000, -5000, 10000, 10000)
 
         self.view = GridGraphicsView(self.scene)
+        self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCentralWidget(self.view)
 
         self.properties = PropertiesPanel(self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.properties)
 
         self.selection = SelectionManager(on_change=self.properties.show_item)
-        self.tool_context = ToolContext(scene=self.scene, selection=self.selection)
+        self.undo = UndoManager()
+        self.tool_context = ToolContext(
+            scene=self.scene, selection=self.selection, undo=self.undo
+        )
         self.event_delegate = CanvasEventDelegate(self.view, self.tool_context)
         self.view.event_delegate = self.event_delegate
 
@@ -485,6 +603,41 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
         self.statusBar().showMessage("Use wheel to zoom, middle mouse to pan, CLI for tools")
+
+    def delete_selected(self) -> None:
+        item = self.selection.current
+        if item is None:
+            return
+
+        def restore() -> None:
+            self.scene.addItem(item)
+            self.selection.select(item)
+
+        self.scene.removeItem(item)
+        self.selection.select(None)
+        self.undo.push(restore)
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        widget = self.focusWidget()
+        if isinstance(widget, (QLineEdit, QTextEdit)):
+            super().keyPressEvent(event)
+            return
+        if event.key() == Qt.Key_Shift:
+            self.event_delegate.ortho_active = True
+        if event.matches(QKeySequence.StandardKey.Undo):
+            self.undo.undo()
+            event.accept()
+            return
+        if event.key() == Qt.Key_Delete:
+            self.delete_selected()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event) -> None:  # noqa: N802
+        if event.key() == Qt.Key_Shift:
+            self.event_delegate.ortho_active = False
+        super().keyReleaseEvent(event)
 
     def activate_tool(self, name: str) -> None:
         tool = self.tools.get(name)

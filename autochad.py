@@ -6,9 +6,15 @@ Run instructions
 1. Install dependencies: ``pip install -r requirements.txt``.
 2. Launch the application: ``python autochad.py``.
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+The application opens a PyQt6 main window with a grid-backed canvas, top toolbar
+for selecting architectural tools, mouse wheel zoom, middle-button panning, and
+selection/undo support via keyboard shortcuts.
+=======
 The application opens a PyQt6 main window with a grid-backed canvas. Use the mouse
 wheel to zoom, the middle mouse button to pan, and the bottom command line to
 switch tools using the keywords ``LINE``, ``CIRCLE``, or ``RECTANGLE``.
+>>>>>>> main
 """
 from __future__ import annotations
 
@@ -17,6 +23,37 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, QLineF, QSize
+from PyQt6.QtGui import (
+    QAction,
+    QActionGroup,
+    QBrush,
+    QColor,
+    QKeySequence,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPolygonF,
+)
+from PyQt6.QtWidgets import (
+    QApplication,
+    QDockWidget,
+    QGraphicsItem,
+    QGraphicsPathItem,
+    QGraphicsRectItem,
+    QGraphicsScene,
+    QGraphicsSimpleTextItem,
+    QGraphicsView,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QTextEdit,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+=======
 from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QKeySequence, QPainter, QPen
 from PyQt6.QtWidgets import (
@@ -37,11 +74,22 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QTextEdit,
+>>>>>>> main
 )
 
 
 GRID_SIZE = 25
 ZOOM_FACTOR = 1.15
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+WALL_THICKNESS = 24.0
+DOOR_WIDTH = 8.0
+ATTACHMENT_SIZE = 12.0
+
+
+def clamp(value: float, min_value: float, max_value: float) -> float:
+    return max(min_value, min(max_value, value))
+=======
+>>>>>>> main
 
 
 class GridGraphicsView(QGraphicsView):
@@ -71,12 +119,19 @@ class GridGraphicsView(QGraphicsView):
         """Draw a light grid in the background."""
         super().drawBackground(painter, rect)
         painter.save()
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+        painter.setPen(QPen(QColor(220, 220, 220, 30)))
+=======
         painter.setPen(QPen(QColor(220, 220, 220, 60)))
+>>>>>>> main
 
         left = int(math.floor(rect.left())) - (int(math.floor(rect.left())) % GRID_SIZE)
         top = int(math.floor(rect.top())) - (int(math.floor(rect.top())) % GRID_SIZE)
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+=======
         # Use QPointF to avoid overload resolution errors when mixing ints/floats.
+>>>>>>> main
         x = float(left)
         while x < rect.right():
             painter.drawLine(QPointF(x, rect.top()), QPointF(x, rect.bottom()))
@@ -157,7 +212,11 @@ class SelectionManager:
             if hasattr(item, "pen"):
                 pen = item.pen()  # type: ignore[attr-defined]
                 self._previous_pen = pen
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+                highlight = QPen(QColor(255, 120, 0))
+=======
                 highlight = QPen(QColor(255, 0, 0))
+>>>>>>> main
                 highlight.setWidthF(max(2.0, pen.widthF()))
                 item.setPen(highlight)  # type: ignore[attr-defined]
         except Exception as exc:  # pragma: no cover - defensive
@@ -175,6 +234,39 @@ class SelectionManager:
 
 
 class UndoManager:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+    """Track reversible actions for undo/redo support."""
+
+    def __init__(self) -> None:
+        self._undo: list[tuple[Callable[[], None], Optional[Callable[[], None]]]] = []
+        self._redo: list[tuple[Callable[[], None], Optional[Callable[[], None]]]] = []
+
+    def push(self, undo: Callable[[], None], redo: Optional[Callable[[], None]] = None) -> None:
+        self._undo.append((undo, redo))
+        self._redo.clear()
+
+    def undo(self) -> None:
+        if not self._undo:
+            return
+        undo, redo = self._undo.pop()
+        try:
+            undo()
+            if redo:
+                self._redo.append((redo, undo))
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"Undo failed: {exc}")
+
+    def redo(self) -> None:
+        if not self._redo:
+            return
+        redo, undo = self._redo.pop()
+        try:
+            redo()
+            self._undo.append((undo, redo))
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"Redo failed: {exc}")
+
+=======
     """Track reversible actions for undo support."""
 
     def __init__(self) -> None:
@@ -192,6 +284,7 @@ class UndoManager:
         except Exception as exc:  # pragma: no cover - defensive
             print(f"Undo failed: {exc}")
 
+>>>>>>> main
 
 @dataclass
 class ToolContext:
@@ -200,6 +293,167 @@ class ToolContext:
     undo: UndoManager
 
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+# --- Graphics items --------------------------------------------------------
+class WallItem(QGraphicsRectItem):
+    """Rectangular wall with hatched fill and aligned dimension label."""
+
+    def __init__(self, start: QPointF, end: QPointF, thickness: float = WALL_THICKNESS):
+        super().__init__()
+        self.start = QPointF(start)
+        self.end = QPointF(end)
+        self.thickness = thickness
+        self.label = QGraphicsSimpleTextItem(self)
+        self.label.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
+        self.label.setBrush(QBrush(QColor(40, 40, 40)))
+        pen = QPen(QColor(0, 90, 180), 2)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        brush = QBrush(QColor(80, 130, 220, 120), Qt.BrushStyle.FDiagPattern)
+        self.setBrush(brush)
+        self.setZValue(1)
+        self.update_geometry()
+
+    def update_geometry(self) -> None:
+        line = self.centerline()
+        length = max(1.0, line.length())
+        self.setRect(0, -self.thickness / 2.0, length, self.thickness)
+        self.setPos(self.start)
+        angle = -line.angle()
+        self.setRotation(angle)
+        self._update_label(length, angle)
+
+    def _update_label(self, length: float, angle: float) -> None:
+        self.label.setText(f"{length:.2f}")
+        br = self.label.boundingRect()
+        self.label.setTransformOriginPoint(br.center())
+        self.label.setPos(length / 2.0, -br.height() / 2.0)
+        self.label.setRotation(angle)
+
+    def centerline(self) -> QLineF:
+        return QLineF(self.start, self.end)
+
+    def project_point(self, pos: QPointF) -> QPointF:
+        line = self.centerline()
+        if line.length() == 0:
+            return QPointF(line.p1())
+        dx = line.x2() - line.x1()
+        dy = line.y2() - line.y1()
+        t = ((pos.x() - line.x1()) * dx + (pos.y() - line.y1()) * dy) / (dx * dx + dy * dy)
+        t = clamp(t, 0.0, 1.0)
+        return QPointF(line.x1() + dx * t, line.y1() + dy * t)
+
+
+class WindowItem(QGraphicsRectItem):
+    """Window rectangle with elevated z-order and red outline."""
+
+    def __init__(self, start: QPointF, end: QPointF, thickness: float = WALL_THICKNESS / 2):
+        super().__init__()
+        self.start = QPointF(start)
+        self.end = QPointF(end)
+        self.thickness = thickness
+        pen = QPen(QColor(220, 60, 60), 2)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        self.setBrush(Qt.BrushStyle.NoBrush)
+        self.setZValue(5)
+        self.update_geometry()
+
+    def update_geometry(self) -> None:
+        line = QLineF(self.start, self.end)
+        length = max(1.0, line.length())
+        self.setRect(0, -self.thickness / 2.0, length, self.thickness)
+        self.setPos(self.start)
+        self.setRotation(-line.angle())
+
+    def centerline(self) -> QLineF:
+        return QLineF(self.start, self.end)
+
+
+class DoorItem(QGraphicsPathItem):
+    """Door slab with swing arc."""
+
+    def __init__(self, start: QPointF, end: QPointF):
+        super().__init__()
+        self.start = QPointF(start)
+        self.end = QPointF(end)
+        pen = QPen(QColor(120, 120, 120), 2)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        self.setBrush(Qt.BrushStyle.NoBrush)
+        self.setZValue(4)
+        self.update_geometry()
+
+    def update_geometry(self) -> None:
+        line = QLineF(self.start, self.end)
+        length = max(1.0, line.length())
+        path = QPainterPath()
+        path.addRect(QRectF(0, -DOOR_WIDTH / 2.0, length, DOOR_WIDTH))
+        path.moveTo(0, 0)
+        arc_rect = QRectF(0, 0, length * 2, length * 2)
+        path.arcTo(arc_rect, 0, 90)
+        self.setPath(path)
+        self.setPos(self.start)
+        self.setRotation(-line.angle())
+
+
+class AttachmentItem(QGraphicsPathItem):
+    """Base class for wall-mounted accessories."""
+
+    def __init__(self, color: QColor, z: float) -> None:
+        super().__init__()
+        pen = QPen(color, 2)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        self.setBrush(Qt.BrushStyle.NoBrush)
+        self.setZValue(z)
+
+
+class SwitchItem(AttachmentItem):
+    def __init__(self) -> None:
+        super().__init__(QColor(200, 40, 40), 6)
+        path = QPolygonF(
+            [
+                QPointF(-ATTACHMENT_SIZE / 2, 0),
+                QPointF(0, -ATTACHMENT_SIZE / 2),
+                QPointF(ATTACHMENT_SIZE / 2, 0),
+                QPointF(0, ATTACHMENT_SIZE / 2),
+            ]
+        )
+        painter_path = path_to_pathitem(path)
+        painter_path.moveTo(0, 0)
+        painter_path.lineTo(0, ATTACHMENT_SIZE)
+        painter_path.addEllipse(QPointF(0, 0), 3, 3)
+        self.setPath(painter_path)
+
+
+class OutletItem(AttachmentItem):
+    def __init__(self) -> None:
+        super().__init__(QColor(200, 40, 40), 6)
+        rect = QRectF(-ATTACHMENT_SIZE / 2, -ATTACHMENT_SIZE / 2, ATTACHMENT_SIZE, ATTACHMENT_SIZE)
+        painter_path = QPainterPath()
+        painter_path.addRect(rect)
+        painter_path.moveTo(-4, 0)
+        painter_path.lineTo(-4, 4)
+        painter_path.moveTo(4, 0)
+        painter_path.lineTo(4, 4)
+        self.setPath(painter_path)
+
+
+def path_to_pathitem(points: QPolygonF) -> QPainterPath:
+    """Convert polygon points to a painter path."""
+    path = QPainterPath()
+    if not points:
+        return path
+    path.moveTo(points[0])
+    for pt in points[1:]:
+        path.lineTo(pt)
+    return path
+
+
+# --- Tools -----------------------------------------------------------------
+=======
+>>>>>>> main
 class CanvasTool:
     """Base class for drawing tools."""
 
@@ -208,8 +462,17 @@ class CanvasTool:
     def __init__(self, context: ToolContext, view: GridGraphicsView) -> None:
         self.context = context
         self.view = view
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+        self.delegate: Optional["CanvasEventDelegate"] = None
         self.preview_item: Optional[QGraphicsItem] = None
 
+    def set_delegate(self, delegate: "CanvasEventDelegate") -> None:
+        self.delegate = delegate
+
+=======
+        self.preview_item: Optional[QGraphicsItem] = None
+
+>>>>>>> main
     def start(self) -> None:
         self.cancel()
 
@@ -218,6 +481,14 @@ class CanvasTool:
             self.context.scene.removeItem(self.preview_item)
             self.preview_item = None
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+    def snap_position(self, pos: QPointF) -> QPointF:
+        if self.delegate:
+            return self.delegate.snap_position(pos)
+        return pos
+
+=======
+>>>>>>> main
     def on_press(self, pos: QPointF) -> None:  # pragma: no cover - UI
         raise NotImplementedError
 
@@ -227,6 +498,61 @@ class CanvasTool:
     def on_release(self, pos: QPointF) -> None:  # pragma: no cover - UI
         raise NotImplementedError
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+
+class WallTool(CanvasTool):
+    name = "WALL"
+
+    def __init__(self, context: ToolContext, view: GridGraphicsView) -> None:
+        super().__init__(context, view)
+        self._start: Optional[QPointF] = None
+
+    def on_press(self, pos: QPointF) -> None:
+        self._start = pos
+        if not self.preview_item:
+            preview = WallItem(pos, pos)
+            pen = preview.pen()
+            pen.setStyle(Qt.PenStyle.DashLine)
+            preview.setPen(pen)
+            self.preview_item = preview
+            self.context.scene.addItem(preview)
+
+    def on_move(self, pos: QPointF) -> None:
+        if self._start is None or not isinstance(self.preview_item, WallItem):
+            return
+        target = pos
+        if self.delegate:
+            target = self.delegate.apply_ortho(pos, self._start)
+        self.preview_item.start = self._start
+        self.preview_item.end = target
+        self.preview_item.update_geometry()
+
+    def on_release(self, pos: QPointF) -> None:
+        if self._start is None:
+            return
+        target = pos
+        if self.delegate:
+            target = self.delegate.apply_ortho(pos, self._start)
+        wall = WallItem(self._start, target)
+        self.context.scene.addItem(wall)
+        self.context.selection.select(wall)
+
+        def undo() -> None:
+            if self.context.selection.current is wall:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(wall)
+
+        def redo() -> None:
+            self.context.scene.addItem(wall)
+            self.context.selection.select(wall)
+
+        self.context.undo.push(undo, redo)
+        self.cancel()
+
+
+class WindowTool(CanvasTool):
+    name = "WINDOW"
+=======
     def finalize(self) -> None:
         self.cancel()
 
@@ -277,6 +603,7 @@ class DimensionRectItem(QGraphicsRectItem):
 
 class LineTool(CanvasTool):
     name = "LINE"
+>>>>>>> main
 
     def __init__(self, context: ToolContext, view: GridGraphicsView) -> None:
         super().__init__(context, view)
@@ -285,6 +612,24 @@ class LineTool(CanvasTool):
     def on_press(self, pos: QPointF) -> None:
         self._start = pos
         if not self.preview_item:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            preview = WindowItem(pos, pos)
+            pen = preview.pen()
+            pen.setStyle(Qt.PenStyle.DashLine)
+            preview.setPen(pen)
+            self.preview_item = preview
+            self.context.scene.addItem(preview)
+
+    def on_move(self, pos: QPointF) -> None:
+        if self._start is None or not isinstance(self.preview_item, WindowItem):
+            return
+        target = pos
+        if self.delegate:
+            target = self.delegate.apply_ortho(pos, self._start)
+        self.preview_item.start = self._start
+        self.preview_item.end = target
+        self.preview_item.update_geometry()
+=======
             pen = QPen(QColor(0, 120, 215))
             pen.setStyle(Qt.PenStyle.DashLine)
             self.preview_item = DimensionLineItem()
@@ -302,10 +647,170 @@ class LineTool(CanvasTool):
             adjusted.x(),
             adjusted.y(),
         )
+>>>>>>> main
 
     def on_release(self, pos: QPointF) -> None:
         if self._start is None:
             return
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+        target = pos
+        if self.delegate:
+            target = self.delegate.apply_ortho(pos, self._start)
+        window = WindowItem(self._start, target)
+        self.context.scene.addItem(window)
+        self.context.selection.select(window)
+
+        def undo() -> None:
+            if self.context.selection.current is window:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(window)
+
+        def redo() -> None:
+            self.context.scene.addItem(window)
+            self.context.selection.select(window)
+
+        self.context.undo.push(undo, redo)
+        self.cancel()
+
+
+class DoorTool(CanvasTool):
+    name = "DOOR"
+
+    def __init__(self, context: ToolContext, view: GridGraphicsView) -> None:
+        super().__init__(context, view)
+        self._start: Optional[QPointF] = None
+
+    def on_press(self, pos: QPointF) -> None:
+        self._start = pos
+        if not self.preview_item:
+            preview = DoorItem(pos, pos)
+            pen = preview.pen()
+            pen.setStyle(Qt.PenStyle.DashLine)
+            preview.setPen(pen)
+            self.preview_item = preview
+            self.context.scene.addItem(preview)
+
+    def on_move(self, pos: QPointF) -> None:
+        if self._start is None or not isinstance(self.preview_item, DoorItem):
+            return
+        target = pos
+        if self.delegate:
+            target = self.delegate.apply_ortho(pos, self._start)
+        self.preview_item.start = self._start
+        self.preview_item.end = target
+        self.preview_item.update_geometry()
+
+    def on_release(self, pos: QPointF) -> None:
+        if self._start is None:
+            return
+        target = pos
+        if self.delegate:
+            target = self.delegate.apply_ortho(pos, self._start)
+        door = DoorItem(self._start, target)
+        self.context.scene.addItem(door)
+        self.context.selection.select(door)
+
+        def undo() -> None:
+            if self.context.selection.current is door:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(door)
+
+        def redo() -> None:
+            self.context.scene.addItem(door)
+            self.context.selection.select(door)
+
+        self.context.undo.push(undo, redo)
+        self.cancel()
+
+
+class WallAttachmentTool(CanvasTool):
+    """Base for switch/outlet tools that snap to the nearest wall."""
+
+    def __init__(self, context: ToolContext, view: GridGraphicsView) -> None:
+        super().__init__(context, view)
+        self._hover_pos: Optional[QPointF] = None
+        self._wall: Optional[WallItem] = None
+
+    def snap_to_wall(self, pos: QPointF) -> Optional[tuple[WallItem, QPointF]]:
+        if not self.delegate:
+            return None
+        return self.delegate.nearest_wall_projection(pos)
+
+    def on_move(self, pos: QPointF) -> None:
+        snapped = self.snap_to_wall(pos)
+        if not snapped:
+            return
+        wall, point = snapped
+        self._hover_pos = point
+        self._wall = wall
+        if not self.preview_item:
+            self.preview_item = self.build_preview()
+            if self.preview_item:
+                self.context.scene.addItem(self.preview_item)
+        if self.preview_item:
+            self.preview_item.setPos(point)
+            self.preview_item.setRotation(wall.rotation())
+
+    def on_press(self, pos: QPointF) -> None:
+        snapped = self.snap_to_wall(pos)
+        if not snapped:
+            QMessageBox.information(self.view, "No wall", "Place switches and outlets on walls.")
+            return
+        wall, point = snapped
+        item = self.build_final()
+        item.setPos(point)
+        item.setRotation(wall.rotation())
+        self.context.scene.addItem(item)
+        self.context.selection.select(item)
+
+        def undo() -> None:
+            if self.context.selection.current is item:
+                self.context.selection.select(None)
+            self.context.scene.removeItem(item)
+
+        def redo() -> None:
+            self.context.scene.addItem(item)
+            self.context.selection.select(item)
+
+        self.context.undo.push(undo, redo)
+
+    def build_preview(self) -> Optional[AttachmentItem]:
+        raise NotImplementedError
+
+    def build_final(self) -> AttachmentItem:
+        raise NotImplementedError
+
+    def on_release(self, pos: QPointF) -> None:  # pragma: no cover - UI
+        return
+
+
+class SwitchTool(WallAttachmentTool):
+    name = "SWITCH"
+
+    def build_preview(self) -> AttachmentItem:
+        preview = SwitchItem()
+        pen = preview.pen()
+        pen.setStyle(Qt.PenStyle.DashLine)
+        preview.setPen(pen)
+        return preview
+
+    def build_final(self) -> AttachmentItem:
+        return SwitchItem()
+
+
+class OutletTool(WallAttachmentTool):
+    name = "OUTLET"
+
+    def build_preview(self) -> AttachmentItem:
+        preview = OutletItem()
+        pen = preview.pen()
+        pen.setStyle(Qt.PenStyle.DashLine)
+        preview.setPen(pen)
+        return preview
+
+    def build_final(self) -> AttachmentItem:
+        return OutletItem()
+=======
         adjusted = self.view.event_delegate.apply_ortho(pos, self._start)
         line_item = DimensionLineItem(
             self._start.x(), self._start.y(), adjusted.x(), adjusted.y()
@@ -421,6 +926,7 @@ class CircleTool(CanvasTool):
 
         self.context.undo.push(undo)
         self.finalize()
+>>>>>>> main
 
 
 class CanvasEventDelegate:
@@ -438,11 +944,19 @@ class CanvasEventDelegate:
             self.active_tool.cancel()
         self.active_tool = tool
         if self.active_tool:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            self.active_tool.set_delegate(self)
+=======
+>>>>>>> main
             self.active_tool.start()
 
     def handle_mouse_press(self, event) -> bool:
         try:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            scene_pos = self.tool_position(event.pos())
+=======
             scene_pos = self.snap_position(self.view.view_to_scene(event.pos()))
+>>>>>>> main
             if self.active_tool:
                 self.active_tool.on_press(scene_pos)
                 return True
@@ -457,7 +971,11 @@ class CanvasEventDelegate:
         if not self.active_tool:
             return False
         try:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            scene_pos = self.tool_position(event.pos())
+=======
             scene_pos = self.snap_position(self.view.view_to_scene(event.pos()))
+>>>>>>> main
             self.active_tool.on_move(scene_pos)
             return True
         except Exception as exc:  # pragma: no cover - defensive
@@ -468,13 +986,26 @@ class CanvasEventDelegate:
         if not self.active_tool:
             return False
         try:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            scene_pos = self.tool_position(event.pos())
+=======
             scene_pos = self.snap_position(self.view.view_to_scene(event.pos()))
+>>>>>>> main
             self.active_tool.on_release(scene_pos)
             return True
         except Exception as exc:  # pragma: no cover - defensive
             QMessageBox.critical(self.view, "Error", f"Mouse release failed: {exc}")
             return True
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+    def tool_position(self, viewport_pos: QPoint) -> QPointF:
+        scene_pos = self.view.view_to_scene(viewport_pos)
+        if isinstance(self.active_tool, WallAttachmentTool):
+            return scene_pos
+        return self.snap_position(scene_pos)
+
+=======
+>>>>>>> main
     def snap_position(self, pos: QPointF) -> QPointF:
         if not self.snap_enabled:
             return pos
@@ -492,7 +1023,25 @@ class CanvasEventDelegate:
             return QPointF(pos.x(), origin.y())
         return QPointF(origin.x(), pos.y())
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+    def nearest_wall_projection(self, pos: QPointF) -> Optional[tuple[WallItem, QPointF]]:
+        best: Optional[tuple[WallItem, QPointF, float]] = None
+        for item in self.context.scene.items():
+            if not isinstance(item, WallItem):
+                continue
+            projected = item.project_point(pos)
+            dist = QLineF(pos, projected).length()
+            if best is None or dist < best[2]:
+                best = (item, projected, dist)
+        if best:
+            return best[0], best[1]
+        return None
 
+
+# --- UI widgets ------------------------------------------------------------
+=======
+
+>>>>>>> main
 class PropertiesPanel(QDockWidget):
     """Dockable widget showing selected item information."""
 
@@ -512,6 +1061,26 @@ class PropertiesPanel(QDockWidget):
             return
         lines = [f"Type: {type(item).__name__}"]
         try:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            if isinstance(item, WallItem):
+                line = item.centerline()
+                lines.append(
+                    f"Wall: start=({line.x1():.2f},{line.y1():.2f}) end=({line.x2():.2f},{line.y2():.2f})"
+                )
+                lines.append(f"Thickness: {item.thickness:.2f}")
+            elif isinstance(item, WindowItem):
+                line = item.centerline()
+                lines.append(
+                    f"Window: start=({line.x1():.2f},{line.y1():.2f}) end=({line.x2():.2f},{line.y2():.2f})"
+                )
+            elif isinstance(item, DoorItem):
+                lines.append(
+                    f"Door: start=({item.start.x():.2f},{item.start.y():.2f}) end=({item.end.x():.2f},{item.end.y():.2f})"
+                )
+            elif isinstance(item, AttachmentItem):
+                pos = item.scenePos()
+                lines.append(f"Attachment at ({pos.x():.2f}, {pos.y():.2f})")
+=======
             if isinstance(item, QGraphicsLineItem):
                 line = item.line()
                 lines.append(
@@ -527,6 +1096,7 @@ class PropertiesPanel(QDockWidget):
                 lines.append(
                     f"Center: ({rect.center().x():.2f}, {rect.center().y():.2f}), r={rect.width()/2:.2f}"
                 )
+>>>>>>> main
             else:
                 lines.append("No extra metadata available")
         except Exception as exc:  # pragma: no cover - defensive
@@ -534,6 +1104,8 @@ class PropertiesPanel(QDockWidget):
         self.text.setPlainText("\n".join(lines))
 
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+=======
 class CommandLineWidget(QWidget):
     """Bottom command line for switching tools."""
 
@@ -565,6 +1137,7 @@ class CommandLineWidget(QWidget):
             self.input.clear()
 
 
+>>>>>>> main
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -574,7 +1147,10 @@ class MainWindow(QMainWindow):
 
         self.view = GridGraphicsView(self.scene)
         self.view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+=======
         self.setCentralWidget(self.view)
+>>>>>>> main
 
         self.properties = PropertiesPanel(self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.properties)
@@ -588,6 +1164,39 @@ class MainWindow(QMainWindow):
         self.view.event_delegate = self.event_delegate
 
         self.tools = {
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            "WALL": WallTool(self.tool_context, self.view),
+            "WINDOW": WindowTool(self.tool_context, self.view),
+            "DOOR": DoorTool(self.tool_context, self.view),
+            "SWITCH": SwitchTool(self.tool_context, self.view),
+            "OUTLET": OutletTool(self.tool_context, self.view),
+        }
+
+        self.toolbar = QToolBar("Tools", self)
+        self.toolbar.setIconSize(QSize(24, 24))
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
+        self.tool_actions: dict[str, QAction] = {}
+        action_group = QActionGroup(self)
+        action_group.setExclusive(True)
+        for name in self.tools:
+            action = QAction(name.title(), self)
+            action.setCheckable(True)
+            action.triggered.connect(lambda checked, n=name: self.activate_tool(n))
+            self.toolbar.addAction(action)
+            action_group.addAction(action)
+            self.tool_actions[name] = action
+
+        self.status_label = QLabel("Wheel to zoom, middle mouse to pan, Shift for ortho")
+        status_container = QWidget()
+        status_layout = QHBoxLayout(status_container)
+        status_layout.addWidget(self.status_label)
+        status_layout.setContentsMargins(8, 0, 8, 0)
+        self.statusBar().addPermanentWidget(status_container)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.addWidget(self.view)
+=======
             "LINE": LineTool(self.tool_context, self.view),
             "RECTANGLE": RectangleTool(self.tool_context, self.view),
             "CIRCLE": CircleTool(self.tool_context, self.view),
@@ -598,12 +1207,16 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(container)
         layout.addWidget(self.view)
         layout.addWidget(self.command_line)
+>>>>>>> main
         layout.setContentsMargins(0, 0, 0, 0)
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+=======
         self.statusBar().showMessage("Use wheel to zoom, middle mouse to pan, CLI for tools")
 
+>>>>>>> main
     def delete_selected(self) -> None:
         item = self.selection.current
         if item is None:
@@ -613,6 +1226,18 @@ class MainWindow(QMainWindow):
             self.scene.addItem(item)
             self.selection.select(item)
 
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+        def remove_again() -> None:
+            if self.selection.current is item:
+                self.selection.select(None)
+            self.scene.removeItem(item)
+
+        self.scene.removeItem(item)
+        self.selection.select(None)
+        self.undo.push(restore, remove_again)
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+=======
         self.scene.removeItem(item)
         self.selection.select(None)
         self.undo.push(restore)
@@ -622,12 +1247,20 @@ class MainWindow(QMainWindow):
         if isinstance(widget, (QLineEdit, QTextEdit)):
             super().keyPressEvent(event)
             return
+>>>>>>> main
         if event.key() == Qt.Key_Shift:
             self.event_delegate.ortho_active = True
         if event.matches(QKeySequence.StandardKey.Undo):
             self.undo.undo()
             event.accept()
             return
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+        if event.matches(QKeySequence.StandardKey.Redo):
+            self.undo.redo()
+            event.accept()
+            return
+=======
+>>>>>>> main
         if event.key() == Qt.Key_Delete:
             self.delete_selected()
             event.accept()
@@ -642,10 +1275,19 @@ class MainWindow(QMainWindow):
     def activate_tool(self, name: str) -> None:
         tool = self.tools.get(name)
         if tool is None:
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+            QMessageBox.warning(self, "Unknown tool", f"Unrecognized tool: {name}")
+            return
+        for key, action in self.tool_actions.items():
+            action.setChecked(key == name)
+        self.event_delegate.set_tool(tool)
+        self.status_label.setText(f"Active tool: {name.title()}")
+=======
             QMessageBox.warning(self, "Unknown command", f"Unrecognized tool: {name}")
             return
         self.event_delegate.set_tool(tool)
         self.statusBar().showMessage(f"Active tool: {name}")
+>>>>>>> main
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self.event_delegate.active_tool:
@@ -661,7 +1303,11 @@ def main() -> None:
         sys.exit(1)
 
     window = MainWindow()
+<<<<<<< codex/create-autochad.py-with-pyqt6-gui-e4m9za
+    window.resize(1200, 800)
+=======
     window.resize(1024, 768)
+>>>>>>> main
     window.show()
     sys.exit(app.exec())
 
